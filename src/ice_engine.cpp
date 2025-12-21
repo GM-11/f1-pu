@@ -8,7 +8,8 @@ ICEEngine::ICEEngine()
       frictionB(0.025), // Slightly higher viscous losses
       frictionC(6e-6),  // Higher squared term for F1 redline (~15,000 RPM)
       intake_manifold_pressure(101325.0), intake_manifold_temperature(300.0),
-      load_torque(30.0) {
+      load_torque(5.0), exhaust_manifold_pressure(constants::ambient_pressure),
+      exhaust_manifold_temperature(950) {
 } // Higher load for dyno-like testing (adjust as needed)
 
 void ICEEngine::setThrottle(double t) { throttle = std::clamp(t, 0.0, 1.0); }
@@ -64,6 +65,36 @@ double ICEEngine::getThrottleAirMassFlow(double throttle, double P_down) const {
   return mass_flow_factor * std::sqrt(nonchoked_sqrt_argument);
 }
 
+double exhaustMassFlowOut(double exhaust_pressure, double exhaust_temperature) {
+  double pr = constants::ambient_pressure / exhaust_pressure;
+  double pr_crit =
+      std::pow(2.0 / (constants::gamma_exhaust + 1.0),
+               constants::gamma_exhaust / (constants::gamma_exhaust - 1.0));
+
+  double flow_coeff = constants::discharge_coefficient *
+                      constants::exhaust_area * exhaust_pressure *
+                      std::sqrt(constants::gamma_exhaust /
+                                (constants::R * exhaust_temperature));
+
+  if (pr <= pr_crit) {
+    // choked
+    double choked_factor =
+        std::pow(2.0 / (constants::gamma_exhaust + 1.0),
+                 (constants::gamma_exhaust + 1.0) /
+                     (2.0 * (constants::gamma_exhaust - 1.0)));
+    return flow_coeff * choked_factor;
+  } else {
+    // non-choked
+    double term = (2.0 / (constants::gamma_exhaust - 1.0)) *
+                  (std::pow(pr, 2.0 / constants::gamma_exhaust) -
+                   std::pow(pr, (constants::gamma_exhaust + 1.0) /
+                                    constants::gamma_exhaust));
+    if (term <= 0.0)
+      return 0.0;
+    return flow_coeff * std::sqrt(term);
+  }
+}
+
 void ICEEngine::update(double dt) {
 
   double rpm = getRPM();
@@ -76,11 +107,8 @@ void ICEEngine::update(double dt) {
 
   volumetric_efficiency = std::clamp(volumetric_efficiency, 0.0, 1.0);
 
-  // double deltaP =
-  //     std::max(0.0, constants::ambient_pressure - intake_manifold_pressure);
-
   // AIR FLOW CALCULATION
-  double mass_per_cycle_single_cylinder =
+  double air_mass_per_cycle_per_cylinder =
       (intake_manifold_pressure * constants::Volume_displacement *
        volumetric_efficiency) /
       (constants::R * intake_manifold_temperature);
@@ -88,11 +116,8 @@ void ICEEngine::update(double dt) {
   double cycles_per_second = rpm / 120.0;
 
   double air_in = getThrottleAirMassFlow(throttle, intake_manifold_pressure);
-  // double air_in = throttle * constants::discharge_coefficient *
-  //                   constants::throttle_area *
-  //                   std::sqrt(2.0 * constants::air_density * deltaP);
 
-  double air_out = mass_per_cycle_single_cylinder * cycles_per_second *
+  double air_out = air_mass_per_cycle_per_cylinder * cycles_per_second *
                    constants::NUM_CYLINDERS;
 
   intake_manifold_pressure += (constants::R * intake_manifold_temperature /
@@ -103,23 +128,65 @@ void ICEEngine::update(double dt) {
                                         constants::ambient_pressure);
 
   // FUEL MASS AND HEAT RELEASE CALCULATION
-  double fuel_mass_per_cycle =
-      mass_per_cycle_single_cylinder / constants::AFR_stoich;
+  double fuel_mass_per_cycle_per_cylinder =
+      air_mass_per_cycle_per_cylinder /
+      (constants::AFR_stoich * constants::gamma);
 
-  double heat_release = fuel_mass_per_cycle * constants::LHV_fuel;
+  double fuel_mass_flow = fuel_mass_per_cycle_per_cylinder * cycles_per_second *
+                          constants::NUM_CYLINDERS;
+  if (fuel_mass_flow >= 10500) {
+    fuel_mass_flow = std::min(fuel_mass_flow, 100.0 / 3600.0);
+  }
 
-  // TORQUE CALCULATION
-  double indicated_torque = (heat_release * constants::thermal_efficiency *
-                             constants::NUM_CYLINDERS) /
-                            (constants::PI * 4);
+  fuel_mass_per_cycle_per_cylinder =
+      fuel_mass_flow / (cycles_per_second * constants::NUM_CYLINDERS);
 
-  double friction_torque = frictionA + frictionB * angular_velocity +
-                           frictionC * angular_velocity * angular_velocity;
+  double heat_release = fuel_mass_per_cycle_per_cylinder * constants::LHV_fuel *
+                        constants::combustion_efficiency;
 
+  double indicated_mean_effective_pressure = constants::thermal_efficiency *
+                                             heat_release /
+                                             constants::Volume_displacement;
+
+  // Per-cylinder torque from IMEP (4-stroke)
+  double indicated_torque = indicated_mean_effective_pressure *
+                            constants::Volume_displacement /
+                            (constants::PI * 4.0);
+
+  // Total engine indicated torque
+  indicated_torque *= constants::NUM_CYLINDERS;
+
+  double friction_pressure = frictionA + frictionB * angular_velocity +
+                             frictionC * angular_velocity * angular_velocity;
+
+  // Per-cylinder friction torque
+  double friction_torque = friction_pressure * constants::Volume_displacement /
+                           (constants::PI * 4.0);
+
+  // Total engine friction torque
+  friction_torque *= constants::NUM_CYLINDERS;
+
+  double m_dot_exh_in =
+      (air_mass_per_cycle_per_cylinder + fuel_mass_per_cycle_per_cylinder) *
+      cycles_per_second * constants::NUM_CYLINDERS;
+
+  double mass_out = exhaustMassFlowOut(exhaust_manifold_pressure,
+                                       exhaust_manifold_temperature);
+
+  double delta_p = (constants::R * exhaust_manifold_temperature /
+                    constants::exhaust_manifold_volume) *
+                   (m_dot_exh_in - mass_out) * dt;
+  exhaust_manifold_pressure += delta_p;
+
+  double pumping_pressure =
+      exhaust_manifold_pressure - intake_manifold_pressure;
+
+  // Per-cylinder pumping torque
   double pumping_torque =
-      constants::k_pump *
-      (constants::ambient_pressure - intake_manifold_pressure) *
-      constants::NUM_CYLINDERS;
+      pumping_pressure * constants::Volume_displacement / (constants::PI * 4.0);
+
+  // Total engine pumping torque
+  pumping_torque *= constants::NUM_CYLINDERS;
 
   double engine_torque = (indicated_torque - friction_torque - pumping_torque);
 
