@@ -18,6 +18,7 @@ double constexpr ambient_pressure = 101325.0;
 double constexpr ambient_temperature = 300.0; // K
 double constexpr gamma = 1.4;                 // Ratio of specific heats for air
 double constexpr gamma_exhaust = 1.33;
+double constexpr lambda = 1.1;
 
 double constexpr exhaust_area = 3e-4;
 
@@ -44,6 +45,17 @@ double constexpr volumetric_efficiency_max = 0.95;
 double constexpr NUM_CYLINDERS = 6;
 
 double constexpr discharge_coefficient = 0.85;
+
+double constexpr CA50_opt = 368.0;  // deg
+double constexpr CA50_sigma = 15.0; // deg
+
+double constexpr crank_anlge_at_combustion_start_deg = 335;
+double constexpr crank_angle_burn_duration = 35;
+
+constexpr double fmepA = 0.4e5;   // Pa
+constexpr double fmepB = 0.02e5;  // Pa / (krpm)
+constexpr double fmepC = 0.002e5; // Pa / (krpm^2)
+constexpr double fmepD = 0.08;    // load sensitivity
 
 double torqueCurve(double rpm);
 } // namespace constants
