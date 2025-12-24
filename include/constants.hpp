@@ -52,10 +52,17 @@ double constexpr CA50_sigma = 15.0; // deg
 double constexpr crank_anlge_at_combustion_start_deg = 335;
 double constexpr crank_angle_burn_duration = 35;
 
+constexpr double exhaust_temp_base = 720.0;  // K
+constexpr double exhaust_temp_gain = 2.0e-5; // K / W
+
 constexpr double fmepA = 0.4e5;   // Pa
 constexpr double fmepB = 0.02e5;  // Pa / (krpm)
 constexpr double fmepC = 0.002e5; // Pa / (krpm^2)
 constexpr double fmepD = 0.08;    // load sensitivity
+
+constexpr double compressor_isentropic_efficiency = 0.7;
+
+constexpr double intake_flow_capacity = 0.27;
 
 double torqueCurve(double rpm);
 } // namespace constants
