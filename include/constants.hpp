@@ -64,6 +64,13 @@ constexpr double compressor_isentropic_efficiency = 0.7;
 
 constexpr double intake_flow_capacity = 0.27;
 
+// constants.hpp
+constexpr double turbo_nominal_speed = 100000.0; // rad/s (≈95k RPM)
+constexpr double turbo_max_air_flow = 1.2;       // kg/s (tune)
+
+constexpr double turbo_max_pr = 3.0;  // realistic max PR
+constexpr double turbo_pr_idle = 1.0; // no boost
+
 double torqueCurve(double rpm);
 } // namespace constants
 #endif // CONSTANTS_HPP
