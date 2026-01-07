@@ -1,5 +1,5 @@
+#include "../include/mgu_h.hpp"
 #include "../include/turbocharger.hpp"
-
 class ICEEngine {
 public:
   ICEEngine();
@@ -16,6 +16,7 @@ public:
 
 private:
   Turbocharger turbo;
+  MGUH mguh;
 
   // state
   double angular_velocity;             // rad/s

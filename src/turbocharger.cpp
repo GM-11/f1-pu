@@ -1,5 +1,7 @@
 #include "../include/turbocharger.hpp"
 #include "../include/constants.hpp"
+#include <algorithm>
+#include <bits/stdc++.h>
 #include <cmath>
 
 Turbocharger::Turbocharger(double inertia, double turbine_eff,
@@ -28,57 +30,75 @@ double Turbocharger::getAvailableAirMassFlow() const {
 
 void Turbocharger::update(double dt, double exhaust_mass_flow,
                           double exhaust_pressure, double exhaust_temperature,
+                          double target_boost_pressure, double mguh_torque) {
 
-                          double target_boost_pressure) {
+  exhaust_pressure =
+      std::max(exhaust_pressure, 1.1 * constants::ambient_pressure);
 
-  double turbine_pressure_ratio =
-      std::max(exhaust_pressure / constants::ambient_pressure, 1.0);
+  double turbine_pr =
+      std::clamp(exhaust_pressure / constants::ambient_pressure, 1.01, 5.0);
 
-  double exhaust_gas_specific_heat = (constants::R * constants::gamma_exhaust) /
-                                     (constants::gamma_exhaust - 1);
+  double cp_exhaust = (constants::R * constants::gamma_exhaust) /
+                      (constants::gamma_exhaust - 1.0);
+
   double turbine_power =
-      exhaust_mass_flow * exhaust_gas_specific_heat * exhaust_temperature *
+      exhaust_mass_flow * cp_exhaust * exhaust_temperature *
       turbine_efficiency *
-      (1.0 - std::pow(turbine_pressure_ratio, (1.0 - constants::gamma_exhaust) /
-                                                  constants::gamma_exhaust));
+      (1.0 - std::pow(turbine_pr, (1.0 - constants::gamma_exhaust) /
+                                      constants::gamma_exhaust));
 
   turbine_power = std::max(turbine_power, 0.0);
 
-  double compressor_pressure_ratio =
-      target_boost_pressure / constants::ambient_pressure;
+  double requested_pr = target_boost_pressure / constants::ambient_pressure;
+
+  double achievable_pr =
+      constants::turbo_pr_idle +
+      (constants::turbo_max_pr - constants::turbo_pr_idle) *
+          std::clamp(shaft_angular_speed / constants::turbo_nominal_speed, 0.0,
+                     1.0);
+
+  double compressor_pr = std::min(requested_pr, achievable_pr);
 
   compressor_outlet_temperature =
       constants::ambient_temperature *
-      (1 + (1 / constants::compressor_isentropic_efficiency) *
-               (std::pow(constants::compressor_isentropic_efficiency,
-                         (constants::gamma - 1) / constants::gamma) -
-                1));
+      (1.0 + (1.0 / compressor_efficiency) *
+                 (std::pow(compressor_pr,
+                           (constants::gamma - 1.0) / constants::gamma) -
+                  1.0));
 
-  double air_specific_heat =
-      (constants::R * constants::gamma) / (constants::gamma - 1);
+  double cp_air = (constants::R * constants::gamma) / (constants::gamma - 1.0);
 
-  double compressor_power =
-      available_air_mass_flow * air_specific_heat *
-      constants::ambient_temperature * (1.0 / compressor_efficiency) *
-      (std::pow(compressor_pressure_ratio,
-                (constants::gamma - 1.0) / constants::gamma) -
-       1.0);
+  double compressor_power = 0.0;
+  if (available_air_mass_flow > 1e-6) {
+    compressor_power =
+        available_air_mass_flow * cp_air *
+        (compressor_outlet_temperature - constants::ambient_temperature);
+  }
 
-  compressor_power = std::max(compressor_power, 0.0);
+  double turbine_torque = (shaft_angular_speed > 10.0)
+                              ? turbine_power / shaft_angular_speed
+                              : turbine_power / 10.0; // prevents stall
 
-  double power_loss = bearing_loss_coeff * shaft_angular_speed;
+  double compressor_torque = (shaft_angular_speed > 10.0)
+                                 ? compressor_power / shaft_angular_speed
+                                 : 0.0;
 
-  double net_shaft_power = turbine_power - compressor_power - power_loss;
+  double bearing_torque = bearing_loss_coeff * shaft_angular_speed;
 
-  double angular_acceleration = net_shaft_power / turbo_inertia;
+  double net_torque =
+      turbine_torque - compressor_torque - bearing_torque + mguh_torque;
 
-  shaft_angular_speed += angular_acceleration * dt;
-  shaft_angular_speed = std::max(shaft_angular_speed, 0.0);
+  double angular_accel = net_torque / turbo_inertia;
 
-  compressor_outlet_pressure =
-      compressor_pressure_ratio * constants::ambient_pressure;
+  shaft_angular_speed += angular_accel * dt;
+  shaft_angular_speed =
+      std::max(shaft_angular_speed, 0.05 * constants::turbo_nominal_speed);
 
-  available_air_mass_flow = (compressor_outlet_pressure /
-                             (constants::R * compressor_outlet_temperature)) *
-                            constants::intake_flow_capacity;
+  compressor_outlet_pressure = compressor_pr * constants::ambient_pressure;
+
+  double speed_ratio = std::clamp(
+      shaft_angular_speed / constants::turbo_nominal_speed, 0.0, 1.5);
+
+  available_air_mass_flow =
+      std::min(speed_ratio * constants::turbo_max_air_flow, exhaust_mass_flow);
 }

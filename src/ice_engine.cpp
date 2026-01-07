@@ -9,9 +9,9 @@ ICEEngine::ICEEngine()
       load_torque(5.0), exhaust_manifold_pressure(constants::ambient_pressure),
       exhaust_manifold_temperature(950),
       plenum_pressure(constants::ambient_pressure), spark_advance_deg(10.0),
-      turbo(2e-5, 0.72, 0.74, 0.02) {
-
-} // Higher load for dyno-like testing (adjust as needed)
+      turbo(2e-5, 0.72, 0.74, 0.02),
+      mguh(2e-6, 0.95, 120000.0) // inertia, eff, max power
+{} // Higher load for dyno-like testing (adjust as needed)
 
 void ICEEngine::setThrottle(double t) { throttle = std::clamp(t, 0.0, 1.0); }
 
@@ -102,14 +102,32 @@ double exhaustMassFlowOut(double exhaust_pressure, double exhaust_temperature) {
 
 void ICEEngine::update(double dt) {
 
-  double target_boost_pressure =
-      /* for now */ 2.5 * constants::ambient_pressure;
+  double target_boost_pressure = 4 * constants::ambient_pressure;
 
   double rpm = std::max(getRPM(), 1.0);
   double cycles_per_second = std::max(rpm / 120.0, 1e-3);
 
+  double boost = turbo.getCompressorOutletPressure();
+
+  // temporary ECU
+  if (throttle > 0.3 && boost < target_boost_pressure) {
+    mguh.setMode(MGUHMode::MOTOR); // anti-lag
+    mguh.setRequestedPower(80000.0);
+  } else if (boost > target_boost_pressure * 1.05 &&
+             exhaust_mass_flow_rate > 0.01) {
+    mguh.setMode(MGUHMode::GENERATOR); // harvest
+    mguh.setRequestedPower(60000.0);
+  } else {
+    mguh.setMode(MGUHMode::IDLE);
+  }
+
+  // --- MGU-H dynamics ---
+  mguh.update(dt, turbo.getShaftAngularSpeed());
+
+  // --- Turbo dynamics (MGU-H coupled here) ---
   turbo.update(dt, exhaust_mass_flow_rate, exhaust_manifold_pressure,
-               exhaust_manifold_temperature, target_boost_pressure);
+               exhaust_manifold_temperature, target_boost_pressure,
+               mguh.getTorque());
 
   // VOLUMETRIC EFFICIENCY CALCULATION
   double volumetric_efficiency =
@@ -125,8 +143,6 @@ void ICEEngine::update(double dt) {
   volumetric_efficiency = std::clamp(volumetric_efficiency, 0.0, 1.2);
 
   // AIR FLOW CALCULATION
-  //
-  intake_manifold_pressure = turbo.getCompressorOutletPressure();
   intake_manifold_temperature = turbo.getCompressorOutletTemperature();
 
   double air_mass_per_cycle_per_cylinder =
@@ -154,7 +170,7 @@ void ICEEngine::update(double dt) {
 
   intake_manifold_pressure =
       std::clamp(intake_manifold_pressure, 0.3 * constants::ambient_pressure,
-                 1.05 * constants::ambient_pressure);
+                 turbo.getCompressorOutletPressure());
 
   // FUEL MASS AND HEAT RELEASE CALCULATION
   double fuel_mass_per_cycle_per_cylinder =

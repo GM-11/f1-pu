@@ -4,10 +4,11 @@ public:
                double compressor_efficiency, double bearing_loss_coeff);
 
   void update(double dt,
-              double exhaust_mass_flow,      // kg/s
-              double exhaust_pressure,       // Pa
-              double exhaust_temperature,    // K
-              double target_boost_pressure); // Pa (wastegate control)
+              double exhaust_mass_flow,     // kg/s
+              double exhaust_pressure,      // Pa
+              double exhaust_temperature,   // K
+              double target_boost_pressure, // Pa (wastegate control)
+              double mgu_torque);
 
   // Outputs to engine
   double getCompressorOutletPressure() const;
