@@ -8,7 +8,7 @@ Turbocharger::Turbocharger(double inertia, double turbine_eff,
                            double compressor_eff, double bearing_loss)
     : turbo_inertia(inertia), turbine_efficiency(turbine_eff),
       compressor_efficiency(compressor_eff), bearing_loss_coeff(bearing_loss),
-      shaft_angular_speed(0.0), // Start at rest
+      shaft_angular_speed(constants::turbo_idle_rad_s), // Start at rest
       compressor_outlet_pressure(constants::ambient_pressure),
       compressor_outlet_temperature(constants::ambient_temperature),
       available_air_mass_flow(0.0) {}
@@ -41,11 +41,15 @@ void Turbocharger::update(double dt, double exhaust_mass_flow,
   double cp_exhaust = (constants::R * constants::gamma_exhaust) /
                       (constants::gamma_exhaust - 1.0);
 
-  double turbine_power =
-      exhaust_mass_flow * cp_exhaust * exhaust_temperature *
-      turbine_efficiency *
-      (1.0 - std::pow(turbine_pr, (1.0 - constants::gamma_exhaust) /
-                                      constants::gamma_exhaust));
+  double expansion_term =
+      1.0 -
+      std::pow(constants::ambient_pressure / exhaust_pressure,
+               (constants::gamma_exhaust - 1.0) / constants::gamma_exhaust);
+
+  expansion_term = std::max(expansion_term, 0.0);
+
+  double turbine_power = turbine_efficiency * exhaust_mass_flow * cp_exhaust *
+                         exhaust_temperature * expansion_term;
 
   turbine_power = std::max(turbine_power, 0.0);
 
@@ -68,20 +72,21 @@ void Turbocharger::update(double dt, double exhaust_mass_flow,
 
   double cp_air = (constants::R * constants::gamma) / (constants::gamma - 1.0);
 
-  double compressor_power = 0.0;
-  if (available_air_mass_flow > 1e-6) {
-    compressor_power =
-        available_air_mass_flow * cp_air *
-        (compressor_outlet_temperature - constants::ambient_temperature);
-  }
+  double speed_ratio = std::clamp(
+      shaft_angular_speed / constants::turbo_nominal_speed, 0.0, 1.5);
 
-  double turbine_torque = (shaft_angular_speed > 10.0)
-                              ? turbine_power / shaft_angular_speed
-                              : turbine_power / 10.0; // prevents stall
+  double compressor_mass_flow = speed_ratio * constants::turbo_max_air_flow;
 
-  double compressor_torque = (shaft_angular_speed > 10.0)
-                                 ? compressor_power / shaft_angular_speed
-                                 : 0.0;
+  double compressor_power =
+      available_air_mass_flow * cp_air *
+      (compressor_outlet_temperature - constants::ambient_temperature);
+
+  double turbine_torque = turbine_power / shaft_angular_speed;
+
+  double compressor_torque = compressor_power / shaft_angular_speed;
+
+  shaft_angular_speed =
+      std::max(shaft_angular_speed, constants::turbo_idle_rad_s);
 
   double bearing_torque = bearing_loss_coeff * shaft_angular_speed;
 
@@ -92,12 +97,9 @@ void Turbocharger::update(double dt, double exhaust_mass_flow,
 
   shaft_angular_speed += angular_accel * dt;
   shaft_angular_speed =
-      std::max(shaft_angular_speed, 0.05 * constants::turbo_nominal_speed);
+      std::max(shaft_angular_speed, constants::turbo_idle_rad_s);
 
   compressor_outlet_pressure = compressor_pr * constants::ambient_pressure;
-
-  double speed_ratio = std::clamp(
-      shaft_angular_speed / constants::turbo_nominal_speed, 0.0, 1.5);
 
   available_air_mass_flow =
       std::min(speed_ratio * constants::turbo_max_air_flow, exhaust_mass_flow);
