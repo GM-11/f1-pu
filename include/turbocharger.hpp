@@ -1,3 +1,5 @@
+#pragma once
+
 class Turbocharger {
 public:
   Turbocharger(double inertia, double turbine_efficiency,

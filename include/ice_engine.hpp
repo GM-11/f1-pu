@@ -1,4 +1,7 @@
+#pragma once
+
 #include "../include/mgu_h.hpp"
+#include "../include/mgu_k.hpp"
 #include "../include/turbocharger.hpp"
 class ICEEngine {
 public:
@@ -14,9 +17,36 @@ public:
   double getThrottleAirMassFlow(double throttle, double P_down) const;
   double getExhaustMassFlowRate() const;
 
+  // ---------------- ENGINE / CRANK ----------------
+  double getCombustionTorque() const;
+  double getLoadTorque() const;
+
+  // ---------------- TURBO / INTAKE ----------------
+  double getTurboSpeed() const;
+  double getBoostPressure() const;
+  double getIntakeManifoldPressure() const;
+  double getIntakeManifoldTemperature() const;
+  double getAirMassFlow() const;
+
+  // ---------------- EXHAUST ----------------
+  double getExhaustManifoldPressure() const;
+  double getExhaustTemperature() const;
+
+  // ---------------- ERS ----------------
+  double getMGUHTorque() const;
+  double getMGUHPower() const;
+
+  double getMGUKTorque() const;
+  double getMGUKPower() const;
+
+  double getBatteryEnergy() const;
+  double getBatterySOC() const;
+
 private:
   Turbocharger turbo;
   MGUH mguh;
+  MGUK mguk;
+  EnergyStore battery;
 
   // state
   double angular_velocity;             // rad/s
@@ -30,4 +60,7 @@ private:
   double plenum_pressure;              // Pa
   double spark_advance_deg;            // BTDC
   double exhaust_mass_flow_rate;
+  double mguk_torque;
+
+  double combustion_torque;
 };

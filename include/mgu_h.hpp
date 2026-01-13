@@ -1,3 +1,5 @@
+#pragma once
+
 enum class MGUHMode { MOTOR, GENERATOR, IDLE };
 
 class MGUH {

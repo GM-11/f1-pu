@@ -62,6 +62,8 @@ constexpr double fmepD = 0.08;    // load sensitivity
 
 constexpr double compressor_isentropic_efficiency = 0.7;
 
+constexpr double idle_gain = 2.0; // Nm per rad/s
+
 constexpr double intake_flow_capacity = 0.27;
 
 // constants.hpp
@@ -70,6 +72,27 @@ constexpr double turbo_max_air_flow = 1.2;       // kg/s (tune)
 
 constexpr double turbo_max_pr = 3.0;  // realistic max PR
 constexpr double turbo_pr_idle = 1.0; // no boost
+
+constexpr double turbo_idle_rad_s = 2100.0;
+
+// ~3,000 rpm
+constexpr double engine_idle_rad_s = 314.0;
+
+constexpr double load_A = 30.0;   // N·m
+constexpr double load_B = 0.02;   // N·m·s/rad
+constexpr double load_C = 0.0005; // N·m·s²/rad²
+
+// Energy Store (Battery)
+constexpr double battery_max_energy_J = 4.0e6;         // 4 MJ
+constexpr double battery_max_charge_power = 120000;    // 120 kW
+constexpr double battery_max_discharge_power = 120000; // 120 kW
+
+// MGU-K
+constexpr double mguk_efficiency = 0.95;    // 95%
+constexpr double mguk_max_power = 120000.0; // 120 kW
+
+constexpr double idle_base_throttle = 0.1; // 4%
+constexpr double idle_throttle_gain = 0.01;
 
 double torqueCurve(double rpm);
 } // namespace constants
