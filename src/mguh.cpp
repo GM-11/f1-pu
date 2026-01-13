@@ -17,10 +17,9 @@ void MGUH::setRequestedPower(double p) {
 }
 
 void MGUH::update(double /*dt*/, double turbo_omega) {
-  omega = turbo_omega;
 
   // avoid division blow-up at low speed
-  if (omega < 1.0) {
+  if (turbo_omega < 1.0) {
     torque = 0.0;
     electricalPower = 0.0;
     return;
@@ -29,12 +28,12 @@ void MGUH::update(double /*dt*/, double turbo_omega) {
   switch (mode) {
   case MGUHMode::GENERATOR:
     electricalPower = clamp(requestedPower, 0.0, maxPower);
-    torque = -electricalPower / (efficiency * omega);
+    torque = -electricalPower / (efficiency * turbo_omega);
     break;
 
   case MGUHMode::MOTOR:
     electricalPower = -clamp(requestedPower, 0.0, maxPower);
-    torque = +(efficiency * (-electricalPower)) / omega;
+    torque = +(efficiency * (-electricalPower)) / turbo_omega;
     break;
 
   case MGUHMode::IDLE:
