@@ -4,7 +4,7 @@
 namespace constants {
 double constexpr R = 287.05; // J/(kg·K) Specific gas constant for air
 double constexpr AFR_stoich =
-    14.7; // Stoichiometric air-fuel ratio for gasoli,,lm,kl, '[ ]
+    14.7; // Stoichiometric air-fuel ratio for gasoline
 double constexpr LHV_fuel =
     43000 * 1000; // J/kg Lower heating value of gasoline (43 MJ/kg)
 double constexpr Volume_displacement =
@@ -24,7 +24,7 @@ double constexpr exhaust_area = 3e-4;
 
 double constexpr air_density = 1.18; // kg/m³ at sea level
 
-double constexpr throttle_diameter = 0.040; // m
+double constexpr throttle_diameter = 0.050; // Increase to 75mm
 double constexpr radius = throttle_diameter * 0.5;
 double constexpr throttle_area = PI * radius * radius;
 
@@ -58,7 +58,7 @@ constexpr double exhaust_temp_gain = 2.0e-5; // K / W
 constexpr double fmepA = 0.4e5;   // Pa
 constexpr double fmepB = 0.02e5;  // Pa / (krpm)
 constexpr double fmepC = 0.002e5; // Pa / (krpm^2)
-constexpr double fmepD = 0.08;    // load sensitivity
+constexpr double fmepD = 0.03;    // load sensitivity
 
 constexpr double compressor_isentropic_efficiency = 0.7;
 
@@ -76,11 +76,11 @@ constexpr double turbo_pr_idle = 1.0; // no boost
 constexpr double turbo_idle_rad_s = 2100.0;
 
 // ~3,000 rpm
-constexpr double engine_idle_rad_s = 314.0;
+constexpr double engine_idle_rad_s = 314.159;
 
-constexpr double load_A = 30.0;   // N·m
-constexpr double load_B = 0.02;   // N·m·s/rad
-constexpr double load_C = 0.0005; // N·m·s²/rad²
+constexpr double load_A = 5.0;    // N·m
+constexpr double load_B = 0.005;  // N·m·s/rad
+constexpr double load_C = 0.0001; // N·m·s²/rad²
 
 // Energy Store (Battery)
 constexpr double battery_max_energy_J = 4.0e6;         // 4 MJ
@@ -91,8 +91,8 @@ constexpr double battery_max_discharge_power = 120000; // 120 kW
 constexpr double mguk_efficiency = 0.95;    // 95%
 constexpr double mguk_max_power = 120000.0; // 120 kW
 
-constexpr double idle_base_throttle = 0.1; // 4%
-constexpr double idle_throttle_gain = 0.01;
+constexpr double idle_base_throttle = 0.05;
+constexpr double idle_throttle_gain = 0.001;
 
 double torqueCurve(double rpm);
 } // namespace constants
